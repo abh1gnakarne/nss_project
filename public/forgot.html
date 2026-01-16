@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>NSS NGO | Reset Password</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="dark">
+    <div class="auth-card">
+        <h2>Reset Password</h2>
+        <input type="email" id="resetEmail" placeholder="Enter your registered email">
+        <input type="password" id="newPass" placeholder="Enter new password">
+        <button class="primary-btn" onclick="handleReset()">Update Password</button>
+        <p><a href="login.html">Back to Login</a></p>
+    </div>
+
+    <script>
+        async function handleReset() {
+            const email = document.getElementById('resetEmail').value;
+            const newPassword = document.getElementById('newPass').value;
+
+            const res = await fetch('http://localhost:5000/api/auth/forgot-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, newPassword })
+            });
+
+            const data = await res.json();
+            alert(data.message);
+            if (res.ok) window.location.href = "login.html";
+        }
+    </script>
+</body>
+</html>

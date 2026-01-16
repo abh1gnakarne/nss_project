@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>NSS NGO | Login</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="dark">
+   <div class="auth-card">
+    <h2>Login</h2>
+    
+    <label for="roleSelector">Select Role:</label>
+    <select id="roleSelector">
+        <option value="user">User / Donor</option>
+        <option value="admin">Administrator</option>
+    </select>
+    
+    <input type="email" id="email" placeholder="Email Address" required>
+    <input type="password" id="password" placeholder="Password" required>
+    
+    <button class="primary-btn" id="loginBtn" onclick="handleLogin()">Login</button>
+    <p><a href="forgot.html">Forgot Password?</a></p>
+    <p>New here? <a href="register.html">Create an account</a></p>
+</div>
+
+<script>
+async function handleLogin() {
+    const emailField = document.getElementById('email');
+    const passwordField = document.getElementById('password');
+    const roleField = document.getElementById('roleSelector');
+
+    if (!emailField || !passwordField || !roleField) {
+        console.error("HTML IDs do not match script expectations.");
+        return;
+    }
+
+    const email = emailField.value;
+    const password = passwordField.value;
+    const role = roleField.value;
+
+    try {
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password, role })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+
+            alert("Login Successful!");
+            if (data.user.role === 'admin') {
+                window.location.href = "admin_dashboard.html";
+            } else {
+                window.location.href = "donate.html";
+            }
+        } else {
+            alert(data.message || "Login failed");
+        }
+    } catch (error) {
+        console.error("Connection Error:", error);
+        alert("Cannot connect to server. Ensure your backend is running.");
+    }
+}
+</script>
+</body>
+</html>

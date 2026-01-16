@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>NSS NGO | Register</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="dark">
+    <div class="auth-card">
+        <h2>Register</h2>
+        <input type="text" id="name" placeholder="Full Name">
+        <input type="email" id="email" placeholder="Email Address">
+        <input type="password" id="password" placeholder="Password">
+        
+        <button class="primary-btn" onclick="handleRegister()">Sign Up</button>
+        <p>Already have an account? <a href="login.html">Login</a></p>
+    </div>
+
+    <script>
+        async function handleRegister() {
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            const response = await fetch('http://localhost:5000/api/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, email, password, role: 'user' })
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                alert("Registration Successful!");
+                window.location.href = "login.html";
+            } else {
+                alert(data.message);
+            }
+        }
+    </script>
+</body>
+</html>

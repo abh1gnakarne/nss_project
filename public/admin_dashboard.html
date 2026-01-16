@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>NSS NGO | Admin Panel</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .admin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: #1e293b; padding: 20px; border-radius: 10px; border-top: 4px solid #10b981; }
+        table { width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 10px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+    </style>
+</head>
+<body class="dark" style="display: block; padding: 30px;">
+    <h1>Admin Dashboard</h1>
+    
+    <div class="admin-grid">
+        <div class="stat-card"><h3>Total Users</h3><h2 id="count-users">0</h2></div>
+        <div class="stat-card"><h3>Total Donations</h3><h2 id="count-donations">0</h2></div>
+        <div class="stat-card"><h3>Total Funds</h3><h2 id="total-money">₹0</h2></div>
+    </div>
+
+    <h3>All Donation Records</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Donor Name</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody id="admin-donation-list"></tbody>
+    </table>
+
+    <script>
+        async function loadAdminData() {
+            const res = await fetch('http://localhost:5000/api/admin/stats');
+            const data = await res.json();
+            
+            document.getElementById('count-users').innerText = data.totalUsers;
+            document.getElementById('count-donations').innerText = data.allDonations.length;
+            document.getElementById('total-money').innerText = `₹${data.totalFunds}`;
+            
+            const list = document.getElementById('admin-donation-list');
+            list.innerHTML = data.allDonations.map(d => `
+                <tr>
+                    <td>${d.userName || 'Unknown'}</td>
+                    <td>₹${d.amount}</td>
+                    <td style="color:${d.status === 'success' ? '#10b981' : '#fbbf24'}">${d.status.toUpperCase()}</td>
+                    <td>${new Date(d.date).toLocaleDateString()}</td>
+                </tr>
+            `).join('');
+        }
+        async function loadAllDonations() {
+    const res = await fetch('http://localhost:5000/api/admin/stats');
+    const data = await res.json();
+    
+    const table = document.getElementById('admin-donation-list');
+    table.innerHTML = data.allDonations.map(d => `
+        <tr>
+            <td>${d.userName}</td>
+            <td>₹${d.amount}</td>
+            <td>${d.status}</td>
+        </tr>
+    `).join('');
+}
+
+function exportData() {
+    const table = document.getElementById('admin-donation-list');
+    let data = "Donor Name, Amount, Status, Date\n";
+    
+    for (let row of table.rows) {
+        let rowData = Array.from(row.cells).map(cell => cell.innerText).join(", ");
+        data += rowData + "\n";
+    }
+    
+    const blob = new Blob([data], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'nss_donations_report.csv';
+    a.click();
+}
+function logout() {
+    localStorage.clear(); 
+    
+    alert("Logged out successfully");
+    // Redirect to login page
+    window.location.href = "login.html";
+}
+        loadAdminData();
+    </script>
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px;">
+    <h2>NSS Dashboard</h2>
+    <button onclick="logout()" style="background-color: #ef4444; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer;">
+        Logout
+    </button>
+</div>
+</body>
+</html>
