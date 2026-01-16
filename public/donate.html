@@ -128,9 +128,10 @@
                 const payment = {
                     "sandbox": true,
                     "merchant_id": data.merchantId,
-                    "return_url": "http://localhost:5000/donate.html",
-                    "cancel_url": "http://localhost:5000/donate.html",
-                    "notify_url": "http://your-deployed-url.com/api/payment/notify",
+                    
+                     return_url: "https://nss-project-gray.vercel.app/success.html",
+                     cancel_url: "https://nss-project-gray.vercel.app/donate.html",
+                     notify_url: "https://nss-project-gray.vercel.app/api/payment/notify",
                     "order_id": orderId,
                     "items": "NSS NGO Donation",
                     "amount": data.amount,
