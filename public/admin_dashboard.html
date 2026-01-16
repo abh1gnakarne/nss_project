@@ -34,7 +34,7 @@
 
     <script>
         async function loadAdminData() {
-            const res = await fetch('http://localhost:5000/api/admin/stats');
+            const res = await fetch('/api/admin/stats');
             const data = await res.json();
             
             document.getElementById('count-users').innerText = data.totalUsers;
@@ -52,7 +52,7 @@
             `).join('');
         }
         async function loadAllDonations() {
-    const res = await fetch('http://localhost:5000/api/admin/stats');
+    const res = await fetch('/api/admin/stats');
     const data = await res.json();
     
     const table = document.getElementById('admin-donation-list');
