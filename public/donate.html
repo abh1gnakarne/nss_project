@@ -5,78 +5,41 @@
     <title>NSS NGO | Donation Dashboard</title>
     <link rel="stylesheet" href="css/style.css">
     <style>
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-top: 20px;
-        }
-        .card {
-            background: #1e293b;
-            padding: 20px;
-            border-radius: 10px;
-            border: 1px solid #334155;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-            background: #0f172a;
-        }
-        th, td {
-            padding: 10px;
-            text-align: left;
-            border-bottom: 1px solid #334155;
-            color: #f8fafc;
-        }
+        .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+        .card { background: #1e293b; padding: 20px; border-radius: 10px; border: 1px solid #334155; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #0f172a; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #334155; color: #f8fafc; }
         .status-pending { color: #fbbf24; font-weight: bold; }
         .status-success { color: #10b981; font-weight: bold; }
-        .status-failed { color: #ef4444; font-weight: bold; }
-        input[type="number"] {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 10px;
-            border-radius: 5px;
-            border: 1px solid #334155;
-            background: #0f172a;
-            color: white;
-        }
+        input[type="number"] { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: 1px solid #334155; background: #0f172a; color: white; }
     </style>
 </head>
 
 <body class="dark" style="padding:20px;">
 <div style="max-width:900px;margin:auto;">
 
-    <!-- HEADER -->
     <div style="display:flex;justify-content:space-between;align-items:center;">
         <h1 id="userWelcome">Welcome</h1>
-        <button onclick="logout()" style="background:#ef4444;color:white;border:none;padding:8px 15px;border-radius:5px;cursor:pointer;">
-            Logout
-        </button>
+        <button onclick="logout()" style="background:#ef4444;color:white;border:none;padding:8px 15px;border-radius:5px;cursor:pointer;">Logout</button>
     </div>
 
-    <!-- DASHBOARD -->
     <div class="dashboard-grid">
-
         <div class="card">
             <h3>Make a Donation</h3>
             <p>Support our cause with a secure payment.</p>
             <input type="number" id="donationAmount" placeholder="Enter Amount">
             <button class="primary-btn" style="width:100%;" onclick="donateNow()">Donate Now</button>
         </div>
-
         <div class="card">
             <h3>My Details</h3>
             <p><strong>Name:</strong> <span id="profName"></span></p>
             <p><strong>Email:</strong> <span id="profEmail"></span></p>
         </div>
-
     </div>
 
-    <!-- HISTORY -->
     <div class="card" style="margin-top:20px;">
         <h3>Donation History</h3>
-        <table>
+        <tbody id="historyBody"></tbody> <table>
             <thead>
             <tr>
                 <th>Date</th>
@@ -85,14 +48,11 @@
                 <th>Action</th>
             </tr>
             </thead>
-            <tbody id="historyBody"></tbody>
+            <tbody id="historyBodyTable"></tbody>
         </table>
     </div>
 
 </div>
-
-<!-- PAYHERE SCRIPT -->
-<script src="https://www.payhere.lk/lib/payhere.js"></script>
 
 <script>
 /* ---------------- AUTH ---------------- */
@@ -114,8 +74,9 @@ async function loadHistory() {
             headers: { Authorization: token }
         });
         const data = await res.json();
-
-        document.getElementById("historyBody").innerHTML = data.map(d => `
+        const tbody = document.getElementById("historyBodyTable");
+        
+        tbody.innerHTML = data.map(d => `
             <tr>
                 <td>${new Date(d.date).toLocaleDateString()}</td>
                 <td>${Number(d.amount).toFixed(2)}</td>
@@ -124,11 +85,11 @@ async function loadHistory() {
             </tr>
         `).join("");
     } catch (e) {
-        console.error(e);
+        console.error("History Error:", e);
     }
 }
 
-/* ---------------- DONATE ---------------- */
+/* ---------------- DONATE (FIXED) ---------------- */
 async function donateNow() {
     const amountInput = document.getElementById("donationAmount").value;
     if (!amountInput || amountInput <= 0) {
@@ -138,61 +99,66 @@ async function donateNow() {
 
     const amount = Number(amountInput).toFixed(2);
     const orderId = "NSS_" + Date.now();
-    const currency = "LKR"; // 🔴 MUST BE LKR IN SANDBOX
+    const currency = "LKR"; 
 
     try {
-        await fetch("/api/donate/initiate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userId: user.id, amount })
-        });
-
+        // 1. Get Hash from Backend
         const res = await fetch("/api/payment/hash", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ order_id: orderId, amount, currency })
         });
 
+        if (!res.ok) throw new Error("Backend Hash Failed");
         const data = await res.json();
 
-        const payment = {
-            sandbox: true,
+        // 2. Create Form Data for PayHere
+        const paymentData = {
             merchant_id: data.merchantId,
-            return_url: "https://nss-project-gray.vercel.app/success.html",
-            cancel_url: "https://nss-project-gray.vercel.app/donate.html",
+            return_url: "https://nss-project-gray.vercel.app/donate.html", // Where to go after success
+            cancel_url: "https://nss-project-gray.vercel.app/donate.html", // Where to go if cancelled
             notify_url: "https://nss-project-gray.vercel.app/api/payment/notify",
             order_id: orderId,
-            items: "NSS NGO Donation",
-            amount: data.amount,
-            currency: data.currency,
-            hash: data.hash,
+            items: "Donation to NSS",
+            currency: currency,
+            amount: amount,
             first_name: user.name,
             last_name: "Donor",
             email: user.email,
-            country: "Sri Lanka"
+            phone: "0771234567",
+            address: "Colombo",
+            city: "Colombo",
+            country: "Sri Lanka",
+            hash: data.hash
         };
 
-        payhere.startPayment(payment);
+        // 3. Submit Form Automatically (Bypasses CORS)
+        submitPayHereForm(paymentData);
 
     } catch (err) {
         console.error(err);
-        alert("Payment initiation failed");
+        alert("Payment initiation failed. Check console.");
     }
 }
 
-/* ---------------- PAYHERE EVENTS ---------------- */
-payhere.onCompleted = function(orderId) {
-    alert("Donation Successful!");
-    window.location.href = "success.html";
-};
+function submitPayHereForm(data) {
+    const form = document.createElement("form");
+    form.setAttribute("method", "POST");
+    form.setAttribute("action", "https://sandbox.payhere.lk/pay/checkout");
 
-payhere.onDismissed = function() {
-    console.log("Payment dismissed");
-};
+    for (const key in data) {
+        if (data.hasOwnProperty(key)) {
+            const hiddenField = document.createElement("input");
+            hiddenField.setAttribute("type", "hidden");
+            hiddenField.setAttribute("name", key);
+            hiddenField.setAttribute("value", data[key]);
+            form.appendChild(hiddenField);
+        }
+    }
 
-payhere.onError = function(error) {
-    alert("PayHere Error: " + error);
-};
+    document.body.appendChild(form);
+    form.submit();
+}
 
 /* ---------------- VERIFY & LOGOUT ---------------- */
 async function verifyPayment(id) {
