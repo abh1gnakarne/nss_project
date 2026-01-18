@@ -10,39 +10,36 @@ const crypto = require('crypto');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Middleware
 app.use(cors());
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true })); 
+app.use(bodyParser.urlencoded({ extended: true }));
 
-
+// Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
-
+// Database Connection
 const MONGO_URI = process.env.MONGODB_URI;
 
 if (!MONGO_URI) {
   console.error("❌ ERROR: MONGODB_URI is not defined in Environment Variables!");
+} else {
+  mongoose.connect(MONGO_URI)
+    .then(() => console.log("✅ MongoDB Connected Successfully"))
+    .catch(err => console.error("❌ MongoDB Connection Error:", err));
 }
 
-mongoose.connect(MONGO_URI)
-  .then(() => console.log("✅ MongoDB Connected Successfully"))
-  .catch(err => console.error("❌ MongoDB Connection Error:", err));
-
-
+// Import Routes
 const authRoutes = require('./backend/routes/auth');
 const donationRoutes = require('./backend/routes/donation');
 const adminRoutes = require('./backend/routes/admin');
 
+// Use Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/donate', donationRoutes);
 app.use('/api/admin', adminRoutes);
 
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'login.html'));
-});
-
-
-router.post('/payment/hash', (req, res) => {
+app.post('/api/payment/hash', (req, res) => {
     try {
         const { order_id, amount, currency } = req.body;
         
@@ -58,7 +55,7 @@ router.post('/payment/hash', (req, res) => {
 
         const hashString = merchantId + order_id + formattedAmount + currency + hashedSecret;
         
-        //  Generate Final Hash
+        // Generate Final Hash
         const hash = crypto.createHash('md5')
             .update(hashString)
             .digest('hex')
@@ -76,10 +73,10 @@ router.post('/payment/hash', (req, res) => {
     }
 });
 
-
 app.post('/api/payment/notify', async (req, res) => {
   const { merchant_id, order_id, payhere_amount, payhere_currency, status_code, md5sig } = req.body;
-  const merchantSecret = process.env.PAYHERE_MERCHANT_SECRET;
+  
+  const merchantSecret = "MTcxMzYwODQ4MjUyNDg2Njk0MTI1MDYxNDAzOTIyMDQ5NjEzNjQ5";
 
   const hashedSecret = crypto.createHash('md5').update(merchantSecret).digest('hex').toUpperCase();
   const localHashString = merchant_id + order_id + payhere_amount + payhere_currency + status_code + hashedSecret;
@@ -87,9 +84,14 @@ app.post('/api/payment/notify', async (req, res) => {
 
   if (localHash === md5sig && status_code == 2) {
     console.log(`✅ Payment SUCCESS for Order ID: ${order_id}`);
+
   }
 
   res.sendStatus(200);
+});
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
 if (process.env.NODE_ENV !== 'production') {
@@ -97,4 +99,5 @@ if (process.env.NODE_ENV !== 'production') {
     console.log(`🚀 Local Server running on http://localhost:${PORT}`);
   });
 }
+
 module.exports = app;
