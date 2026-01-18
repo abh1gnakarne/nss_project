@@ -89,7 +89,6 @@ async function loadHistory() {
     }
 }
 
-/* ---------------- DONATE (FIXED) ---------------- */
 async function donateNow() {
     const amountInput = document.getElementById("donationAmount").value;
     if (!amountInput || amountInput <= 0) {
@@ -100,23 +99,35 @@ async function donateNow() {
     const amount = Number(amountInput).toFixed(2);
     const orderId = "NSS_" + Date.now();
     const currency = "LKR"; 
+    
+    const merchantId = "1233599"; 
 
     try {
-        // 1. Get Hash from Backend
         const res = await fetch("/api/payment/hash", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ order_id: orderId, amount, currency })
+            body: JSON.stringify({ 
+                order_id: orderId, 
+                amount: amount, 
+                currency: currency,
+                merchant_id: merchantId 
+            })
         });
 
-        if (!res.ok) throw new Error("Backend Hash Failed");
+        if (!res.ok) {
+            const err = await res.json();
+            alert("Backend Error: " + err.message);
+            return;
+        }
+
         const data = await res.json();
 
-        // 2. Create Form Data for PayHere
+        // Create Form Data for PayHere
         const paymentData = {
-            merchant_id: data.merchantId,
-            return_url: "https://nss-project-gray.vercel.app/donate.html", // Where to go after success
-            cancel_url: "https://nss-project-gray.vercel.app/donate.html", // Where to go if cancelled
+            sandbox: true,
+            merchant_id: merchantId, 
+            return_url: "https://nss-project-gray.vercel.app/donate.html",
+            cancel_url: "https://nss-project-gray.vercel.app/donate.html",
             notify_url: "https://nss-project-gray.vercel.app/api/payment/notify",
             order_id: orderId,
             items: "Donation to NSS",
@@ -129,16 +140,31 @@ async function donateNow() {
             address: "Colombo",
             city: "Colombo",
             country: "Sri Lanka",
-            hash: data.hash
+            hash: data.hash 
         };
 
-        // 3. Submit Form Automatically (Bypasses CORS)
         submitPayHereForm(paymentData);
 
     } catch (err) {
         console.error(err);
-        alert("Payment initiation failed. Check console.");
+        alert("Payment initiation failed.");
     }
+}
+
+function submitPayHereForm(data) {
+    const form = document.createElement("form");
+    form.setAttribute("method", "POST");
+    form.setAttribute("action", "https://sandbox.payhere.lk/pay/checkout");
+
+    for (const key in data) {
+        const hiddenField = document.createElement("input");
+        hiddenField.setAttribute("type", "hidden");
+        hiddenField.setAttribute("name", key);
+        hiddenField.setAttribute("value", data[key]);
+        form.appendChild(hiddenField);
+    }
+    document.body.appendChild(form);
+    form.submit();
 }
 
 function submitPayHereForm(data) {

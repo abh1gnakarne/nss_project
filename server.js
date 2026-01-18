@@ -42,24 +42,38 @@ app.get('/', (req, res) => {
 });
 
 
-app.post('/api/payment/hash', (req, res) => {
-  const { order_id, amount, currency } = req.body;
+router.post('/payment/hash', (req, res) => {
+    try {
+        const { order_id, amount, currency } = req.body;
+        
+        const merchantId = "1233599"; 
+        const merchantSecret = "MTcxMzYwODQ4MjUyNDg2Njk0MTI1MDYxNDAzOTIyMDQ5NjEzNjQ5";
 
-  const merchantId = process.env.PAYHERE_MERCHANT_ID;
-  const merchantSecret = process.env.PAYHERE_MERCHANT_SECRET;
+        const formattedAmount = Number(amount).toFixed(2); 
 
-  if (!merchantId || !merchantSecret) {
-    return res.status(500).json({ error: "Merchant configuration missing in Vercel settings" });
-  }
+        const hashedSecret = crypto.createHash('md5')
+            .update(merchantSecret)
+            .digest('hex')
+            .toUpperCase();
 
-  const formattedAmount = Number(amount).toFixed(2);
-  
-  // PayHere Hash Logic
-  const hashedSecret = crypto.createHash('md5').update(merchantSecret).digest('hex').toUpperCase();
-  const hashString = merchantId + order_id + formattedAmount + currency + hashedSecret;
-  const hash = crypto.createHash('md5').update(hashString).digest('hex').toUpperCase();
+        const hashString = merchantId + order_id + formattedAmount + currency + hashedSecret;
+        
+        //  Generate Final Hash
+        const hash = crypto.createHash('md5')
+            .update(hashString)
+            .digest('hex')
+            .toUpperCase();
 
-  res.json({ merchantId, orderId: order_id, amount: formattedAmount, currency, hash });
+        res.json({ 
+            merchantId: merchantId, 
+            hash: hash, 
+            amount: formattedAmount, 
+            currency: currency 
+        });
+    } catch (error) {
+        console.error("Hashing Error:", error);
+        res.status(500).json({ message: error.message });
+    }
 });
 
 
