@@ -63,6 +63,13 @@ app.post('/api/payment/hash', (req, res) => {
             .update(merchantSecret).digest('hex').toUpperCase();
 
         const hashString = merchantId + order_id + formattedAmount + currency + hashedSecret;
+        console.log("Hashing Details:", {
+            merchantId,
+            order_id,
+            formattedAmount,
+            currency,
+            hashedSecretPrefix: hashedSecret.substring(0, 5) + "..."
+        });
         const hash = crypto.createHash('md5').update(hashString).digest('hex').toUpperCase();
 
         res.json({ merchantId, hash, amount: formattedAmount, currency });
