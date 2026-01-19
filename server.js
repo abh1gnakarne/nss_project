@@ -6,6 +6,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
 const crypto = require('crypto');
+const Donation = require('./backend/models/Donation');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -22,7 +23,7 @@ const connectDB = async () => {
     if (isConnected) return;
     try {
         const db = await mongoose.connect(process.env.MONGODB_URI, {
-            serverSelectionTimeoutMS: 5000 
+            serverSelectionTimeoutMS: 5000
         });
         isConnected = db.connections[0].readyState;
         console.log("✅ MongoDB Connected Successfully");
@@ -48,10 +49,15 @@ app.use('/api/admin', adminRoutes);
 app.post('/api/payment/hash', (req, res) => {
     try {
         const { order_id, amount, currency } = req.body;
-        
-        const merchantId = "1233599"; 
-        const merchantSecret = "MTcxMzYwODQ4MjUyNDg2Njk0MTI1MDYxNDAzOTIyMDQ5NjEzNjQ5";
-        const formattedAmount = Number(amount).toFixed(2); 
+
+        const merchantId = process.env.PAYHERE_MERCHANT_ID;
+        const merchantSecret = process.env.PAYHERE_MERCHANT_SECRET;
+
+        if (!merchantId || !merchantSecret) {
+            return res.status(500).json({ message: "PayHere credentials not configured" });
+        }
+
+        const formattedAmount = Number(amount).toFixed(2);
 
         const hashedSecret = crypto.createHash('md5')
             .update(merchantSecret).digest('hex').toUpperCase();
@@ -68,8 +74,50 @@ app.post('/api/payment/hash', (req, res) => {
 
 // Payment Notify Route
 app.post('/api/payment/notify', async (req, res) => {
-    console.log("Payment Notification Received:", req.body);
-    res.sendStatus(200);
+    try {
+        const {
+            merchant_id,
+            order_id,
+            payhere_amount,
+            payhere_currency,
+            status_code,
+            md5sig
+        } = req.body;
+
+        const merchantSecret = process.env.PAYHERE_MERCHANT_SECRET;
+        const hashedSecret = crypto.createHash('md5').update(merchantSecret).digest('hex').toUpperCase();
+
+        const localMd5Sig = crypto.createHash('md5')
+            .update(merchant_id + order_id + payhere_amount + payhere_currency + status_code + hashedSecret)
+            .digest('hex').toUpperCase();
+
+        if (localMd5Sig !== md5sig) {
+            console.error("❌ Invalid Signature for order:", order_id);
+            return res.status(400).send("Invalid Signature");
+        }
+
+        if (status_code == "2") {
+            console.log(`✅ Payment Success for Order: ${order_id}`);
+
+            // Find donation by transactionId (which matches order_id) and update status
+            const donation = await Donation.findOneAndUpdate(
+                { transactionId: order_id },
+                { status: 'success' },
+                { new: true }
+            );
+
+            if (donation) {
+                console.log(`Payment saved for user: ${donation.userName}`);
+            } else {
+                console.warn(`Payment received but no matching donation found for order: ${order_id}`);
+            }
+        }
+
+        res.sendStatus(200);
+    } catch (err) {
+        console.error("Notify Error:", err);
+        res.sendStatus(500);
+    }
 });
 
 app.get('/', (req, res) => {

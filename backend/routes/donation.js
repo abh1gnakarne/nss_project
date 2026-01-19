@@ -5,8 +5,8 @@ const Donation = require('../models/Donation');
 // Initiate Donation (Saves as PENDING)
 router.post('/initiate', async (req, res) => {
     try {
-        const { userId, userName, amount } = req.body;
-        const newDonation = new Donation({ userId, userName, amount, status: 'pending' });
+        const { userId, userName, amount, transactionId } = req.body;
+        const newDonation = new Donation({ userId, userName, amount, transactionId, status: 'pending' });
         await newDonation.save();
         res.status(201).json(newDonation);
     } catch (err) {
@@ -28,8 +28,8 @@ router.get('/history/:userId', async (req, res) => {
 router.put('/verify/:id', async (req, res) => {
     try {
         const updated = await Donation.findByIdAndUpdate(
-            req.params.id, 
-            { status: 'success' }, 
+            req.params.id,
+            { status: 'success' },
             { new: true }
         );
         res.json({ message: "Payment Verified", updated });
