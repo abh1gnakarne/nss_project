@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <title>NSS NGO | Donation Dashboard</title>
     <link rel="stylesheet" href="css/style.css">
+    <script src="https://js.stripe.com/v3/"></script>
     <style>
         .dashboard-grid {
             display: grid;
@@ -54,6 +55,24 @@
             background: #0f172a;
             color: white;
         }
+
+        /* Stripe Element Styling */
+        #card-element {
+            background: #0f172a;
+            padding: 12px;
+            border-radius: 5px;
+            border: 1px solid #334155;
+            margin-bottom: 20px;
+        }
+
+        .StripeElement {
+            width: 100%;
+            color: white;
+        }
+
+        .StripeElement--invalid {
+            border-color: #ef4444;
+        }
     </style>
 </head>
 
@@ -70,8 +89,17 @@
             <div class="card">
                 <h3>Make a Donation</h3>
                 <p>Support our cause with a secure payment.</p>
+
+                <label>Amount (LKR)</label>
                 <input type="number" id="donationAmount" placeholder="Enter Amount">
-                <button class="primary-btn" style="width:100%;" onclick="donateNow()">Donate Now</button>
+
+                <label>Card Details</label>
+                <div id="card-element">
+                    <!-- Stripe Card Element -->
+                </div>
+
+                <button id="submitBtn" class="primary-btn" style="width:100%;" onclick="processDonation()">Donate
+                    Now</button>
             </div>
             <div class="card">
                 <h3>My Details</h3>
@@ -82,7 +110,6 @@
 
         <div class="card" style="margin-top:20px;">
             <h3>Donation History</h3>
-            <tbody id="historyBody"></tbody>
             <table>
                 <thead>
                     <tr>
@@ -111,6 +138,43 @@
         document.getElementById("profName").innerText = user.name;
         document.getElementById("profEmail").innerText = user.email;
 
+        let stripe;
+        let card;
+
+        /* ---------------- INITIALIZE STRIPE ---------------- */
+        async function setupStripe() {
+            try {
+                const { publishableKey } = await fetch("/api/payment/config").then(r => r.json());
+                stripe = Stripe(publishableKey);
+
+                const elements = stripe.elements({
+                    fonts: [{ cssSrc: 'https://fonts.googleapis.com/css?family=Roboto' }]
+                });
+
+                const style = {
+                    base: {
+                        color: "#ffffff",
+                        fontFamily: 'Roboto, sans-serif',
+                        fontSmoothing: "antialiased",
+                        fontSize: "16px",
+                        "::placeholder": {
+                            color: "#aab7c4"
+                        }
+                    },
+                    invalid: {
+                        color: "#fa755a",
+                        iconColor: "#fa755a"
+                    }
+                };
+
+                card = elements.create("card", { style: style });
+                card.mount("#card-element");
+            } catch (e) {
+                console.error("Stripe Setup Error:", e);
+            }
+        }
+        setupStripe();
+
         /* ---------------- LOAD HISTORY ---------------- */
         async function loadHistory() {
             try {
@@ -133,7 +197,8 @@
             }
         }
 
-        async function donateNow() {
+        /* ---------------- PROCESS DONATION ---------------- */
+        async function processDonation() {
             const amountInput = document.getElementById("donationAmount").value;
             if (!amountInput || amountInput <= 0) {
                 alert("Enter a valid amount");
@@ -142,10 +207,13 @@
 
             const amount = Number(amountInput).toFixed(2);
             const orderId = "NSS_" + Date.now();
-            const currency = "LKR";
+
+            const submitBtn = document.getElementById("submitBtn");
+            submitBtn.disabled = true;
+            submitBtn.innerText = "Processing...";
 
             try {
-                // 1. Initiate Donation (save as pending)
+                // 1. Initiate Donation (Pending)
                 const initRes = await fetch("/api/donate/initiate", {
                     method: "POST",
                     headers: {
@@ -160,78 +228,58 @@
                     })
                 });
 
-                if (!initRes.ok) {
-                    throw new Error("Failed to initiate donation");
-                }
+                if (!initRes.ok) throw new Error("Failed to initiate donation");
+                const donationRecord = await initRes.json();
 
-                // 2. Get Hash from Backend
-                const res = await fetch("/api/payment/hash", {
+                // 2. Create Payment Intent
+                const intentRes = await fetch("/api/payment/create-payment-intent", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        order_id: orderId,
-                        amount: amount,
-                        currency: currency,
-                    })
+                    body: JSON.stringify({ amount, currency: "lkr" }),
                 });
 
-                if (!res.ok) {
-                    const err = await res.json();
-                    alert("Backend Error: " + err.message);
-                    return;
+                const { clientSecret } = await intentRes.json();
+                if (!clientSecret) throw new Error("Failed to initialize payment");
+
+                // 3. Confirm Payment
+                const result = await stripe.confirmCardPayment(clientSecret, {
+                    payment_method: {
+                        card: card,
+                        billing_details: {
+                            name: user.name,
+                            email: user.email
+                        }
+                    }
+                });
+
+                if (result.error) {
+                    // Show error to your customer
+                    alert(result.error.message);
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = "Donate Now";
+                } else {
+                    // Payment Success
+                    if (result.paymentIntent.status === 'succeeded') {
+                        alert("Payment Successful! Thank you.");
+
+                        // 4. Verify/Update Status in Backend
+                        await verifyPayment(donationRecord._id);
+
+                        // Clear inputs
+                        document.getElementById("donationAmount").value = "";
+                        card.clear();
+
+                        submitBtn.disabled = false;
+                        submitBtn.innerText = "Donate Now";
+                    }
                 }
-
-                const data = await res.json();
-                const baseUrl = window.location.origin;
-
-                // 3. Create Form Data for PayHere
-                const paymentData = {
-                    sandbox: true,
-                    merchant_id: data.merchantId,
-                    return_url: `${baseUrl}/donate.html`,
-                    cancel_url: `${baseUrl}/donate.html`,
-                    notify_url: `${baseUrl}/api/payment/notify`,
-                    order_id: orderId,
-                    items: "Donation to NSS",
-                    currency: currency,
-                    amount: amount,
-                    first_name: user.name,
-                    last_name: "Donor",
-                    email: user.email,
-                    phone: "0771234567",
-                    address: "Colombo",
-                    city: "Colombo",
-                    country: "Sri Lanka",
-                    custom_1: user.id || user._id,
-                    hash: data.hash
-                };
-
-                submitPayHereForm(paymentData);
 
             } catch (err) {
                 console.error(err);
-                alert("Payment initiation failed: " + err.message);
+                alert("Error: " + err.message);
+                submitBtn.disabled = false;
+                submitBtn.innerText = "Donate Now";
             }
-        }
-
-
-        function submitPayHereForm(data) {
-            const form = document.createElement("form");
-            form.setAttribute("method", "POST");
-            form.setAttribute("action", "https://sandbox.payhere.lk/pay/checkout");
-
-            for (const key in data) {
-                if (data.hasOwnProperty(key)) {
-                    const hiddenField = document.createElement("input");
-                    hiddenField.setAttribute("type", "hidden");
-                    hiddenField.setAttribute("name", key);
-                    hiddenField.setAttribute("value", data[key]);
-                    form.appendChild(hiddenField);
-                }
-            }
-
-            document.body.appendChild(form);
-            form.submit();
         }
 
         /* ---------------- VERIFY & LOGOUT ---------------- */
