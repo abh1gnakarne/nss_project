@@ -100,7 +100,6 @@ async function donateNow() {
     const orderId = "NSS_" + Date.now();
     const currency = "LKR"; 
     
-    const merchantId = "1233599"; 
 
     try {
         const res = await fetch("/api/payment/hash", {
@@ -110,7 +109,6 @@ async function donateNow() {
                 order_id: orderId, 
                 amount: amount, 
                 currency: currency,
-                merchant_id: merchantId 
             })
         });
 
@@ -125,7 +123,6 @@ async function donateNow() {
         // Create Form Data for PayHere
         const paymentData = {
             sandbox: true,
-            merchant_id: merchantId, 
             return_url: "https://nss-project-gray.vercel.app/donate.html",
             cancel_url: "https://nss-project-gray.vercel.app/donate.html",
             notify_url: "https://nss-project-gray.vercel.app/api/payment/notify",
@@ -151,40 +148,7 @@ async function donateNow() {
     }
 }
 
-function submitPayHereForm(data) {
-    const form = document.createElement("form");
-    form.setAttribute("method", "POST");
-    form.setAttribute("action", "https://sandbox.payhere.lk/pay/checkout");
 
-    for (const key in data) {
-        const hiddenField = document.createElement("input");
-        hiddenField.setAttribute("type", "hidden");
-        hiddenField.setAttribute("name", key);
-        hiddenField.setAttribute("value", data[key]);
-        form.appendChild(hiddenField);
-    }
-    document.body.appendChild(form);
-    form.submit();
-}
-
-function submitPayHereForm(data) {
-    const form = document.createElement("form");
-    form.setAttribute("method", "POST");
-    form.setAttribute("action", "https://sandbox.payhere.lk/pay/checkout");
-
-    for (const key in data) {
-        if (data.hasOwnProperty(key)) {
-            const hiddenField = document.createElement("input");
-            hiddenField.setAttribute("type", "hidden");
-            hiddenField.setAttribute("name", key);
-            hiddenField.setAttribute("value", data[key]);
-            form.appendChild(hiddenField);
-        }
-    }
-
-    document.body.appendChild(form);
-    form.submit();
-}
 
 /* ---------------- VERIFY & LOGOUT ---------------- */
 async function verifyPayment(id) {
